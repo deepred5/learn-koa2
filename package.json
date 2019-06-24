@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/deepred5/learn-koa2#readme",
   "dependencies": {
+    "delegates": "^1.0.0",
     "koa": "^2.7.0"
   }
 }
