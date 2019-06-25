@@ -1,32 +1,69 @@
 const http = require('http');
+const Emitter = require('events');
 const context = require('./context');
 const request = require('./request');
 const response = require('./response');
 
-class Application {
+class Application extends Emitter {
   constructor() {
-    this.callbackFn = null;
+    super();
+    this.middleware = [];
     this.context = Object.create(context);
     this.request = Object.create(request);
     this.response = Object.create(response);
   }
 
   use(fn) {
-    this.callbackFn = fn;
+    this.middleware.push(fn);
   }
 
+  compose (middleware) {
+    if (!Array.isArray(middleware)) throw new TypeError('Middleware stack must be an array!')
+    for (const fn of middleware) {
+      if (typeof fn !== 'function') throw new TypeError('Middleware must be composed of functions!')
+    }
+  
+    /**
+     * @param {Object} context
+     * @return {Promise}
+     * @api public
+     */
+  
+    return function (context, next) {
+      // last called middleware #
+      let index = -1
+      return dispatch(0)
+      function dispatch (i) {
+        if (i <= index) return Promise.reject(new Error('next() called multiple times'))
+        index = i
+        let fn = middleware[i]
+        if (i === middleware.length) fn = next
+        if (!fn) return Promise.resolve()
+        try {
+          return Promise.resolve(fn(context, dispatch.bind(null, i + 1)));
+        } catch (err) {
+          return Promise.reject(err)
+        }
+      }
+    }
+  }
+  
+
   callback() {
+    const fn = this.compose(this.middleware);
+
     const handleRequest = (req, res) => {
       const ctx = this.createContext(req, res);
-      return this.handleRequest(ctx)
+      return this.handleRequest(ctx, fn)
     };
 
     return handleRequest;
   }
 
-  handleRequest(ctx) {
+  handleRequest(ctx, fnMiddleware) {
     const handleResponse = () => respond(ctx);
-    return this.callbackFn(ctx).then(handleResponse);
+    const onerror = err => ctx.onerror(err);
+    return fnMiddleware(ctx).then(handleResponse).catch(onerror);
   }
 
   createContext(req, res) {
@@ -36,6 +73,7 @@ class Application {
     ctx.response = Object.create(this.response);
     ctx.req = ctx.request.req = req;
     ctx.res = ctx.response.res = res;
+    ctx.app = ctx.request.app = ctx.response.app = this;
     return ctx;
   }
 

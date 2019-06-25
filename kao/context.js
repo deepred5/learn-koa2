@@ -13,6 +13,21 @@ const proto = module.exports = {
       socket: '<original node socket>'
     };
   },
+
+  onerror(err) {
+    const { res } = this;
+
+    if ('ENOENT' == err.code) {
+      err.status = 404;
+    } else {
+      err.status = 500;
+    }
+
+    this.status = err.status;
+    this.app.emit('error', err, this);
+    
+    res.end(err.message || 'Internal error');
+  }
 }
 
 // proto.status => proto.response.status
