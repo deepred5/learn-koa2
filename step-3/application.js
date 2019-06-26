@@ -1,13 +1,11 @@
 const http = require('http');
-const Emitter = require('events');
 const context = require('./context');
 const request = require('./request');
 const response = require('./response');
 const compose = require('koa-compose');
 
-class Application extends Emitter {
+class Application {
   constructor() {
-    super();
     this.middleware = []; // 存储中间件
     this.context = Object.create(context);
     this.request = Object.create(request);
@@ -32,9 +30,8 @@ class Application extends Emitter {
 
   handleRequest(ctx, fnMiddleware) {
     const handleResponse = () => respond(ctx);
-    const onerror = err => ctx.onerror(err);
-    // catch捕获，触发ctx的onerror方法
-    return fnMiddleware(ctx).then(handleResponse).catch(onerror);
+    // 执行中间件并把最后的结果交给respond
+    return fnMiddleware(ctx).then(handleResponse);
   }
 
   createContext(req, res) {

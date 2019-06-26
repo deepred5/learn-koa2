@@ -13,23 +13,6 @@ const proto = module.exports = {
       socket: '<original node socket>'
     };
   },
-
-  onerror(err) {
-    // 默认的中间件报错捕获
-    const { res } = this;
-
-    if ('ENOENT' == err.code) {
-      err.status = 404;
-    } else {
-      err.status = 500;
-    }
-
-    // 触发error事件
-    this.app.emit('error', err, this);
-
-    this.status = err.status;
-    res.end(err.message || 'Internal error');
-  }
 }
 
 // delegates 原理就是__defineGetter__和__defineSetter__

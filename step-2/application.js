@@ -1,44 +1,40 @@
 const http = require('http');
-const Emitter = require('events');
 const context = require('./context');
 const request = require('./request');
 const response = require('./response');
-const compose = require('koa-compose');
 
-class Application extends Emitter {
+class Application {
   constructor() {
-    super();
-    this.middleware = []; // 存储中间件
+    this.callbackFn = null;
+    // 每个Kao实例的context request respones
     this.context = Object.create(context);
     this.request = Object.create(request);
     this.response = Object.create(response);
   }
 
   use(fn) {
-    this.middleware.push(fn); // 存储中间件
+    this.callbackFn = fn;
   }
 
   callback() {
-    // 合成所有中间件
-    const fn = compose(this.middleware);
-
     const handleRequest = (req, res) => {
       const ctx = this.createContext(req, res);
-      return this.handleRequest(ctx, fn)
+      return this.handleRequest(ctx)
     };
 
     return handleRequest;
   }
 
-  handleRequest(ctx, fnMiddleware) {
+  handleRequest(ctx) {
     const handleResponse = () => respond(ctx);
-    const onerror = err => ctx.onerror(err);
-    // catch捕获，触发ctx的onerror方法
-    return fnMiddleware(ctx).then(handleResponse).catch(onerror);
+    // callbackFn是个async函数，最后返回promise对象
+    return this.callbackFn(ctx).then(handleResponse);
   }
 
   createContext(req, res) {
     // 针对每个请求，都要创建ctx对象
+    // 每个请求的ctx request response
+    // ctx代理原生的req res就是在这里代理的
     let ctx = Object.create(this.context);
     ctx.request = Object.create(this.request);
     ctx.response = Object.create(this.response);
@@ -57,6 +53,13 @@ class Application extends Emitter {
 module.exports = Application;
 
 function respond(ctx) {
+  // 根据ctx.body的类型，返回最后的数据
+  /* 可能的类型，代码删减了部分判断
+  1. string
+  2. Buffer
+  3. Stream
+  4. Object
+  */
   let content = ctx.body;
   if (typeof content === 'string') {
     ctx.res.end(content);
